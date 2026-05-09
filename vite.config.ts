@@ -3,6 +3,8 @@ import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 import fs from 'fs'
 
+const useHttps = fs.existsSync('./server.key') && fs.existsSync('./server.crt')
+
 export default defineConfig({
   plugins: [vue()],
   base: '/',
@@ -20,9 +22,11 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    https: {
-      key: fs.readFileSync('./server.key'),
-      cert: fs.readFileSync('./server.crt'),
-    },
+    ...(useHttps ? {
+      https: {
+        key: fs.readFileSync('./server.key'),
+        cert: fs.readFileSync('./server.crt'),
+      },
+    } : {}),
   },
 })
