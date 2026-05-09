@@ -21,10 +21,9 @@ emcc \
   -I"$INC" \
   -o "$OUT_DIR/keymod.wasm" \
   -O3 \
+  -s STANDALONE_WASM=0 \
   -s WASM=1 \
-  -s MODULARIZE=1 \
-  -s EXPORT_NAME="createKeymodModule" \
-  -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+  -s EXPORTED_RUNTIME_METHODS='[]' \
   -s EXPORTED_FUNCTIONS='[ \
     "_km_hid_code", \
     "_km_hid_code_for_char", \
@@ -35,11 +34,12 @@ emcc \
     "_km_parse_token", \
     "_km_parse_macro", \
     "_km_tokenize_script", \
-    "_km_checksum" \
+    "_km_checksum", \
+    "_malloc", \
+    "_free" \
   ]' \
-  -s ENVIRONMENT=web \
   -s ALLOW_MEMORY_GROWTH=1 \
-  -s INITIAL_MEMORY=65536
+  -s INITIAL_MEMORY=131072
 
 echo "[wasm] Output: $OUT_DIR/keymod.wasm"
 ls -lh "$OUT_DIR/keymod.wasm"
