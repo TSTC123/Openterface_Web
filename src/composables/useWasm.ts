@@ -1,6 +1,6 @@
 /**
  * WASM loader for Openterface_Core (keymod library).
- * Uses the Emscripten-generated JS glue (keymod.js) which loads keymod.wasm.
+ * Loads the Emscripten-generated keymod.js from the public directory at runtime.
  */
 
 export interface KeymodWASM {
@@ -32,15 +32,24 @@ interface EmscriptenModule {
   HEAP32: Int32Array
 }
 
+type CreateModule = () => Promise<EmscriptenModule>
+
 let keymod: KeymodWASM | null = null
 
 export async function loadWasm(): Promise<KeymodWASM> {
   if (keymod) return keymod
 
-  // Import the Emscripten-generated module (keymod.js + keymod.wasm are co-located)
-  const createModule = (await import(/* @vite-ignore */ '/keymod.js')).default
+  // Load the Emscripten-generated module via dynamic script tag
+  // keymod.js is served from the public directory
+  await loadScript('keymod.js')
 
-  const mod = await createModule() as EmscriptenModule
+  // The MODULARIZE build exposes createKeymodModule as a global
+  const createModule = (window as any).createKeymodModule as CreateModule
+  if (!createModule) {
+    throw new Error('Emscripten module not found. keymod.js failed to load.')
+  }
+
+  const mod = await createModule()
 
   const { ccall, _malloc, _free, HEAPU8, HEAP32 } = mod
 
@@ -147,6 +156,16 @@ export async function loadWasm(): Promise<KeymodWASM> {
   }
 
   return keymod
+}
+
+function loadScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = src
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error(`Failed to load script: ${src}`))
+    document.head.appendChild(script)
+  })
 }
 
 export function getKeymod(): KeymodWASM {
