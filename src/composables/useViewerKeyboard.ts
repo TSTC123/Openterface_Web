@@ -3,13 +3,16 @@ import { useSerial } from './useSerial'
 import { getKeymod, isWasmReady } from './useWasm'
 import { useSerialCommands } from './useSerialCommands'
 
+// Module-level modifier state
+const activeModifiers = {
+  ctrlLeft: false, shiftLeft: false, altLeft: false, metaLeft: false,
+  ctrlRight: false, shiftRight: false, altRight: false, metaRight: false,
+}
+
 export function useViewerKeyboard() {
   const enabled = ref(false)
   const { isConnected } = useSerial()
-  const { sendKeyPress, sendKeyDown, sendKeyUp } = useSerialCommands()
-
-  // Currently pressed keys (by event.code)
-  const pressedKeys = new Map<string, number>() // code → hidCode
+  const { sendKeyPress, sendKeyUp } = useSerialCommands()
 
   const keyDownHandler = (e: KeyboardEvent) => handleEvent(e, true)
   const keyUpHandler = (e: KeyboardEvent) => handleEvent(e, false)
@@ -40,33 +43,22 @@ export function useViewerKeyboard() {
       return
     }
 
-    if (pressed) {
-      pressedKeys.set(code, hidCode)
-      const modifiers = computeModifiers(event)
-      // Only non-modifier keys go in key slots; modifiers are in the modifier byte
-      const keys = Array.from(pressedKeys.values()).filter(k => k < 0xe0).slice(0, 6)
-      console.log('[Keyboard] sending keyDown, modifiers:', modifiers.toString(16), 'keys:', keys.map(k => k.toString(16)))
-      sendKeyDown(modifiers, keys)
-    } else {
-      pressedKeys.delete(code)
-      if (pressedKeys.size === 0) {
-        // All keys released, send empty report
-        console.log('[Keyboard] sending keyUp')
-        sendKeyUp()
-      } else {
-        // Send remaining held keys
-        const modifiers = computeModifiers(event)
-        const keys = Array.from(pressedKeys.values()).filter(k => k < 0xe0).slice(0, 6)
-        console.log('[Keyboard] sending keyDown (still held), modifiers:', modifiers.toString(16), 'keys:', keys.map(k => k.toString(16)))
-        sendKeyDown(modifiers, keys)
-      }
+    // Update modifier tracking
+    trackModifier(code, pressed)
+
+    // Only handle non-modifier keys; modifiers update the modifier byte for the next key tap
+    if (hidCode >= 0xe0) return
+
+    if (pressed && !event.repeat) {
+      const modifiers = computeModifiers()
+      console.log('[Keyboard] sending keyPress, modifiers:', modifiers.toString(16), 'hidCode:', hidCode.toString(16))
+      sendKeyPress(modifiers, hidCode)
     }
   }
 
   function releaseAll(): void {
     if (!isConnected.value) return
     sendKeyUp()
-    pressedKeys.clear()
   }
 
   onMounted(() => {
@@ -195,11 +187,28 @@ function mapCodeToHid(code: string, km: ReturnType<typeof getKeymod>): number {
   return direct[code] ?? -1
 }
 
-function computeModifiers(event: KeyboardEvent): number {
+function computeModifiers(): number {
   let mod = 0
-  if (event.ctrlKey) mod |= 0x01
-  if (event.shiftKey) mod |= 0x02
-  if (event.altKey) mod |= 0x04
-  if (event.metaKey) mod |= 0x08
+  if (activeModifiers.ctrlLeft)  mod |= 0x01
+  if (activeModifiers.shiftLeft) mod |= 0x02
+  if (activeModifiers.altLeft)   mod |= 0x04
+  if (activeModifiers.metaLeft)  mod |= 0x08
+  if (activeModifiers.ctrlRight) mod |= 0x10
+  if (activeModifiers.shiftRight) mod |= 0x20
+  if (activeModifiers.altRight)  mod |= 0x40
+  if (activeModifiers.metaRight) mod |= 0x80
   return mod
+}
+
+function trackModifier(code: string, pressed: boolean): void {
+  switch (code) {
+    case 'ControlLeft':  activeModifiers.ctrlLeft = pressed; break
+    case 'ControlRight': activeModifiers.ctrlRight = pressed; break
+    case 'ShiftLeft':    activeModifiers.shiftLeft = pressed; break
+    case 'ShiftRight':   activeModifiers.shiftRight = pressed; break
+    case 'AltLeft':      activeModifiers.altLeft = pressed; break
+    case 'AltRight':     activeModifiers.altRight = pressed; break
+    case 'MetaLeft':     activeModifiers.metaLeft = pressed; break
+    case 'MetaRight':    activeModifiers.metaRight = pressed; break
+  }
 }
