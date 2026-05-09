@@ -1,0 +1,3 @@
+[submodule "Openterface_Core"]
+	path = Openterface_Core
+	url = https://github.com/TechxArtisanStudio/Openterface_Core.git
