@@ -5,7 +5,7 @@ import { useSerialCommands } from './useSerialCommands'
 
 export function useViewerKeyboard() {
   const enabled = ref(false)
-  const km = getKeymod()
+  const km = () => getKeymod()
   const { isConnected } = useSerial()
   const { sendKeyDown, sendKeyUp } = useSerialCommands()
 
@@ -23,7 +23,7 @@ export function useViewerKeyboard() {
     event.stopPropagation()
 
     const code = event.code
-    const hidCode = mapCodeToHid(code, km)
+    const hidCode = mapCodeToHid(code, km())
     if (hidCode < 0) return
 
     // Compute modifier state from the event

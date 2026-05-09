@@ -9,23 +9,23 @@ const FRAME_HEAD = new Uint8Array([0x57, 0xab, 0x00])
 
 export function useSerialCommands() {
   const { write } = useSerial()
-  const km = getKeymod()
+  const km = () => getKeymod()
 
   /** Send a keyboard press+release (single key) */
   async function sendKeyPress(modifiers: number, hidCode: number): Promise<void> {
-    const packet = km.buildPressRelease(modifiers, hidCode)
+    const packet = km().buildPressRelease(modifiers, hidCode)
     await write(packet)
   }
 
   /** Send a keyboard press (key held down) */
   async function sendKeyDown(modifiers: number, hidCode: number): Promise<void> {
-    const packet = km.buildKeyboard(modifiers, [hidCode])
+    const packet = km().buildKeyboard(modifiers, [hidCode])
     await write(packet)
   }
 
   /** Send a keyboard release (all keys up) */
   async function sendKeyUp(): Promise<void> {
-    const packet = km.buildKeyboard(0, [])
+    const packet = km().buildKeyboard(0, [])
     await write(packet)
   }
 
@@ -64,7 +64,7 @@ export function useSerialCommands() {
     dy: number,
     wheel: number,
   ): Promise<void> {
-    const packet = km.buildMouseRel(buttons, dx, dy, wheel)
+    const packet = km().buildMouseRel(buttons, dx, dy, wheel)
     await write(packet)
   }
 
