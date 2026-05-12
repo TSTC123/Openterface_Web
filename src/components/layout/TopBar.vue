@@ -4,7 +4,6 @@ import { useSerial } from '../../composables/useSerial'
 import { useViewerMedia } from '../../composables/useViewerMedia'
 import { useBrowserDetection } from '../../composables/useBrowserDetection'
 import CameraSelector from '../video/CameraSelector.vue'
-import InputToggles from '../input/InputToggles.vue'
 import type { Ref } from 'vue'
 
 const { state, connect, disconnect, isConnected } = useSerial()
@@ -82,12 +81,6 @@ const stateLabel = computed(() => {
       </svg>
       {{ stateLabel }}
     </button>
-
-    <!-- Keyboard/Mouse Toggles (only if serial connected) -->
-    <template v-if="detection.fullSupport && isConnected">
-      <div class="h-5 w-px bg-slate-700 mx-1 shrink-0" />
-      <InputToggles />
-    </template>
 
     <!-- Spacer -->
     <div class="flex-1" />

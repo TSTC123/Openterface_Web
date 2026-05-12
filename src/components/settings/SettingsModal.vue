@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useViewerMedia, CAMERA_RESOLUTIONS } from '../../composables/useViewerMedia'
+import { useSerial } from '../../composables/useSerial'
 
 const emit = defineEmits<{ close: [] }>()
 
@@ -9,6 +10,7 @@ const pasteDelay = ref(30)
 const showAllDevices = ref(false)
 
 const media = useViewerMedia()
+const serial = useSerial()
 
 async function applyResolution(res: typeof CAMERA_RESOLUTIONS[number]): Promise<void> {
   await media.applySettings({ width: res.width, height: res.height })
@@ -100,6 +102,19 @@ function forgetDevices(): void {
             />
             <span class="text-xs font-mono text-slate-300 w-12 text-right">{{ pasteDelay }}ms</span>
           </div>
+        </div>
+
+        <!-- Serial Logging -->
+        <div>
+          <label class="flex items-center gap-2">
+            <input
+              v-model="serial.logEnabled.value"
+              type="checkbox"
+              class="rounded border-slate-700 bg-slate-800 text-orange-500 w-4 h-4"
+            />
+            <span class="text-sm font-medium text-slate-300">Serial Console Logging</span>
+          </label>
+          <p class="text-xs text-slate-500 mt-1">Print serial protocol frames to browser console</p>
         </div>
 
         <!-- Danger Zone -->

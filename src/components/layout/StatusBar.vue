@@ -5,15 +5,13 @@ interface Props {
   capsLock: boolean
   scrollLock: boolean
   usbMode: 'host' | 'target'
-  mouseX: number
-  mouseY: number
 }
 
 defineProps<Props>()
 </script>
 
 <template>
-  <div class="flex items-center justify-between px-3 py-1 bg-slate-900 border-y border-slate-800 h-7 shrink-0 text-xs">
+  <div class="flex items-center px-3 py-1 bg-slate-900 border-y border-slate-800 h-7 shrink-0 text-xs">
     <!-- Left: Lock indicators + USB mode -->
     <div class="flex items-center gap-2">
       <span class="flex items-center gap-1.5">
@@ -28,10 +26,5 @@ defineProps<Props>()
         </span>
       </span>
     </div>
-
-    <!-- Right: Mouse coords -->
-    <span class="font-mono text-slate-500">
-      X: {{ mouseX }}, Y: {{ mouseY }}
-    </span>
   </div>
 </template>

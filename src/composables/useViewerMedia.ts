@@ -16,9 +16,7 @@ const currentSettings = ref<MediaTrackSettings | null>(null)
 const error = ref<string | null>(null)
 
 const filteredDevices = computed(() =>
-  devices.value.filter((d) =>
-    showAllDevices.value ? true : d.label.toLowerCase().includes('openterface'),
-  ),
+  devices.value.filter((d) => d.kind === 'videoinput'),
 )
 
 export function useViewerMedia() {
@@ -26,10 +24,13 @@ export function useViewerMedia() {
     if (!('mediaDevices' in navigator)) return []
     try {
       const all = await navigator.mediaDevices.enumerateDevices()
+      console.log('[ViewerMedia] enumerateDevices:', all.map(d => ({ kind: d.kind, deviceId: d.deviceId.slice(0,8), label: d.label })))
       devices.value = all.filter((d) => d.kind === 'videoinput')
+      console.log('[ViewerMedia] filtered video inputs:', devices.value.map(d => ({ deviceId: d.deviceId.slice(0,8), label: d.label })))
       return devices.value
     } catch (err) {
       error.value = `Failed to enumerate devices: ${err}`
+      console.error('[ViewerMedia]', error.value)
       return []
     }
   }
@@ -43,7 +44,7 @@ export function useViewerMedia() {
       console.error('[ViewerMedia] mediaDevices not available')
       return false
     }
-    console.log('[ViewerMedia] connect called, videoEl:', !!videoEl)
+    console.log('[ViewerMedia] connect called, videoEl:', !!videoEl, 'requestedDeviceId:', deviceId)
     await refreshDevices()
     console.log('[ViewerMedia] devices:', devices.value.map(d => ({ label: d.label, id: d.deviceId.slice(0, Math.min(8, d.deviceId.length)) })))
     console.log('[ViewerMedia] filtered devices:', filteredDevices.value.map(d => ({ label: d.label, id: d.deviceId.slice(0, Math.min(8, d.deviceId.length)) })))
@@ -53,6 +54,7 @@ export function useViewerMedia() {
     if (!targetId && hasValidDevices) {
       targetId = filteredDevices.value[0]?.deviceId || devices.value[0]?.deviceId
     }
+    selectedDevice.value = targetId
     console.log('[ViewerMedia] hasValidDevices:', hasValidDevices, 'targetId:', targetId?.slice(0, 8))
     if (!targetId && !hasValidDevices) {
       console.log('[ViewerMedia] no valid deviceId — will request any available camera (pre-permission)')
@@ -62,8 +64,8 @@ export function useViewerMedia() {
       console.log('[ViewerMedia] requesting getUserMedia...')
       const stream = await navigator.mediaDevices.getUserMedia({
         video: targetId
-          ? { deviceId: { exact: targetId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-          : true,
+          ? { deviceId: { exact: targetId }, width: { min: 1920, ideal: 1920 }, height: { min: 1080, ideal: 1080 } }
+          : { width: { min: 1920, ideal: 1920 }, height: { min: 1080, ideal: 1080 } },
       })
       console.log('[ViewerMedia] got stream, tracks:', stream.getTracks().map(t => t.label))
 
@@ -72,15 +74,41 @@ export function useViewerMedia() {
       if (video) {
         video.srcObject = stream
         console.log('[ViewerMedia] srcObject set, video.paused:', video.paused, 'video.readyState:', video.readyState)
-        await video.play().catch((e) => {
+        try {
+          await video.play()
+        } catch (e) {
           console.error('[ViewerMedia] video play error:', e)
-        })
+          enabled.value = false
+          error.value = `Failed to play video: ${e}`
+          return false
+        }
         console.log('[ViewerMedia] after play, video.paused:', video.paused, 'video.readyState:', video.readyState, 'video.videoWidth:', video.videoWidth)
       }
 
       const track = stream.getVideoTracks()[0]
       if (track) {
         currentSettings.value = track.getSettings()
+        // If the camera started at a lower resolution, try to upgrade
+        const w = currentSettings.value.width ?? 0
+        const h = currentSettings.value.height ?? 0
+        if (w > 0 && w < 1920) {
+          console.log('[ViewerMedia] started at low res', w, 'x', h, '— requesting 1920x1080')
+          try {
+            await track.applyConstraints({ width: { ideal: 1920 }, height: { ideal: 1080 } })
+            currentSettings.value = track.getSettings()
+            console.log('[ViewerMedia] upgraded to', currentSettings.value.width, 'x', currentSettings.value.height)
+          } catch (e) {
+            console.warn('[ViewerMedia] could not upgrade resolution:', e)
+          }
+        }
+      }
+
+      // Refresh device list now that permission is granted — labels were empty before
+      await refreshDevices()
+      console.log('[ViewerMedia] post-connect selectedDevice:', selectedDevice.value, 'filteredDevices:', filteredDevices.value.map(d => d.deviceId.slice(0,8)))
+      if (!selectedDevice.value && filteredDevices.value.length > 0) {
+        selectedDevice.value = filteredDevices.value[0].deviceId
+        console.log('[ViewerMedia] set selectedDevice to first device:', selectedDevice.value.slice(0,8))
       }
 
       enabled.value = true
@@ -96,7 +124,7 @@ export function useViewerMedia() {
   }
 
   function disconnect(): void {
-    console.log('[ViewerMedia] disconnect called')
+    console.log('[ViewerMedia] disconnect called, selectedDevice:', selectedDevice.value)
     const video = document.querySelector('video') as HTMLVideoElement
     if (video?.srcObject) {
       const stream = video.srcObject as MediaStream
@@ -126,8 +154,9 @@ export function useViewerMedia() {
   }
 
   async function changeDevice(deviceId: string): Promise<boolean> {
+    console.log('[ViewerMedia] changeDevice:', deviceId.slice(0,8))
     disconnect()
-    return connect(deviceId)
+    return connect(undefined, deviceId)
   }
 
   return {
@@ -144,3 +173,6 @@ export function useViewerMedia() {
     changeDevice,
   }
 }
+
+// Log initial state
+console.log('[ViewerMedia] module initialized')

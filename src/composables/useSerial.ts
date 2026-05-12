@@ -12,8 +12,12 @@ let readLoopRunning = false
 const state = ref<SerialState>(SerialState.Disconnected)
 const deviceInfo = ref<DeviceInfo | null>(null)
 const logLines = ref<string[]>([])
+const logEnabled = ref(false)
+const baudrate = ref(0)
 
 const parser = new FrameParser()
+
+let reader: ReadableStreamDefaultReader | null = null
 
 export function useSerial() {
   const isConnected = computed(() => state.value === SerialState.Connected)
@@ -48,25 +52,23 @@ export function useSerial() {
       const info = serialPort.value.getInfo()
       log(`USB Product ID: 0x${info.usbProductId?.toString(16) ?? 'unknown'}`)
 
-      let baudrate: number
-      if (info.usbProductId === USB.KVMGO_PID) {
-        baudrate = USB.KVMGO_BAUDRATE
-      } else if (info.usbProductId === USB.MINIKVM_PID) {
-        baudrate = USB.MINIKVM_BAUDRATE
+      let baud: number
+      // Use existing baudrate if already set (for baudrate switching), otherwise default to 115200
+      if (baudrate.value > 0) {
+        baud = baudrate.value
       } else {
-        baudrate = USB.FACTORY_BAUDRATE
+        baud = USB.MINIKVM_BAUDRATE
       }
 
-      await serialPort.value.open({ baudRate: baudrate })
-      log(`Connected at ${baudrate} baud`)
+      await serialPort.value.open({ baudRate: baud })
+      log(`Connected at ${baud} baud`)
+      baudrate.value = baud
 
-      // Create writer for writing to the serial port
-      writer = serialPort.value.writable.getWriter()
+      writer = serialPort.value.writable!.getWriter()
 
       state.value = SerialState.Connected
       startReadLoop()
 
-      // Query device info
       await writeQuery(Command.CMD_GET_INFO)
 
       return true
@@ -80,8 +82,17 @@ export function useSerial() {
 
   async function disconnect(): Promise<void> {
     state.value = SerialState.Disconnected
-
     readLoopRunning = false
+
+    // Cancel the reader to unblock any pending read() call
+    if (reader) {
+      try {
+        await reader.cancel()
+      } catch {
+        /* ignore */
+      }
+      reader = null
+    }
 
     if (writer) {
       try {
@@ -102,7 +113,17 @@ export function useSerial() {
     }
 
     deviceInfo.value = null
+    baudrate.value = 0
     log('Disconnected')
+  }
+
+  async function setBaudrate(newBaud: number): Promise<boolean> {
+    await disconnect()
+    baudrate.value = newBaud
+    // Wait for port to fully close
+    await new Promise(r => setTimeout(r, 200))
+    // Reconnect at new baudrate — connect() will use baudrate.value if set
+    return connect()
   }
 
   async function write(data: Uint8Array): Promise<void> {
@@ -134,12 +155,12 @@ export function useSerial() {
     if (!serialPort.value?.readable) return
     readLoopRunning = true
 
-    const reader = serialPort.value.readable.getReader()
+    reader = serialPort.value.readable.getReader()
 
     async function loop(): Promise<void> {
       try {
         while (readLoopRunning) {
-          const { value, done } = await reader.read()
+          const { value, done } = await reader!.read()
           if (done) break
           if (!value) continue
 
@@ -154,7 +175,7 @@ export function useSerial() {
         }
       } finally {
         try {
-          reader.releaseLock()
+          reader!.releaseLock()
         } catch {
           /* ignore */
         }
@@ -190,6 +211,10 @@ export function useSerial() {
     }
   }
 
+  async function queryDeviceInfo(): Promise<void> {
+    await writeQuery(Command.CMD_GET_INFO)
+  }
+
   function computeChecksum(data: Uint8Array): number {
     let sum = 0
     for (let i = 0; i < data.length; i++) sum += data[i]
@@ -197,7 +222,9 @@ export function useSerial() {
   }
 
   function log(msg: string): void {
-    console.log(`[Serial] ${msg}`)
+    if (logEnabled.value) {
+      console.log(`[Serial] ${msg}`)
+    }
     logLines.value.push(`[${new Date().toLocaleTimeString()}] ${msg}`)
     if (logLines.value.length > 200) logLines.value.shift()
   }
@@ -206,10 +233,14 @@ export function useSerial() {
     state,
     deviceInfo,
     logLines,
+    logEnabled,
+    baudrate,
     isConnected,
     connect,
     disconnect,
     write,
     writeQuery,
+    setBaudrate,
+    queryDeviceInfo,
   }
 }

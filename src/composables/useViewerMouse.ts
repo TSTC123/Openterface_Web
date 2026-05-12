@@ -10,17 +10,19 @@ export function useViewerMouse() {
   let currentButton = 0
   let lastX = 0
   let lastY = 0
+  let lastContainerRect: { left: number; top: number; width: number; height: number } | null = null
 
   const { isConnected } = useSerial()
   const { sendMouseAbsolute: serialSendMouseAbs } = useSerialCommands()
 
   function handleClick(e: MouseEvent): void {
-    console.log('[Mouse] click, button:', e.button, 'enabled:', enabled.value)
     if (!enabled.value || !isConnected.value) return
     isPressed = true
     currentButton = mapButton(e.button)
     updatePosition(e)
-    const { absX, absY } = getAbsoluteCoords()
+    const { pixelX, pixelY, absX, absY } = getAbsoluteCoords()
+    mouse.x = pixelX
+    mouse.y = pixelY
     serialSendMouseAbs(currentButton, absX, absY, 0)
   }
 
@@ -28,10 +30,11 @@ export function useViewerMouse() {
     isPressed = false
     const btn = currentButton
     currentButton = 0
-    console.log('[Mouse] up, button:', btn, 'enabled:', enabled.value)
     if (!enabled.value || !isConnected.value) return
     updatePosition(e)
-    const { absX, absY } = getAbsoluteCoords()
+    const { pixelX, pixelY, absX, absY } = getAbsoluteCoords()
+    mouse.x = pixelX
+    mouse.y = pixelY
     serialSendMouseAbs(0, absX, absY, 0)
   }
 
@@ -41,7 +44,9 @@ export function useViewerMouse() {
       return
     }
 
-    const { absX, absY } = getAbsoluteCoords()
+    const { pixelX, pixelY, absX, absY } = getAbsoluteCoords()
+    mouse.x = pixelX
+    mouse.y = pixelY
     serialSendMouseAbs(isPressed ? currentButton : 0, absX, absY, 0)
   }
 
@@ -50,24 +55,27 @@ export function useViewerMouse() {
     e.preventDefault()
     e.stopPropagation()
     const delta = e.deltaY > 0 ? 0xff : 0x01
-    console.log('[Mouse] wheel, delta:', delta)
     serialSendMouseAbs(0, 0, 0, delta)
   }
 
   function updatePosition(e: MouseEvent): void {
     lastX = e.clientX
     lastY = e.clientY
+    const container = videoEl.value?.parentElement
+    if (container) {
+      const r = container.getBoundingClientRect()
+      lastContainerRect = { left: r.left, top: r.top, width: r.width, height: r.height }
+    }
   }
 
-  function getAbsoluteCoords(): { absX: number; absY: number } {
-    if (!videoEl.value) return { absX: 0, absY: 0 }
-    const rect = videoEl.value.getBoundingClientRect()
+  function getAbsoluteCoords(): { pixelX: number; pixelY: number; absX: number; absY: number } {
+    if (!videoEl.value) return { pixelX: 0, pixelY: 0, absX: 0, absY: 0 }
+    const rect = lastContainerRect ?? videoEl.value.getBoundingClientRect()
     const nativeW = videoEl.value.videoWidth
     const nativeH = videoEl.value.videoHeight
 
-    if (!nativeW || !nativeH) return { absX: 0, absY: 0 }
+    if (!nativeW || !nativeH) return { pixelX: 0, pixelY: 0, absX: 0, absY: 0 }
 
-    // Compute the actual displayed video size (object-contain preserves aspect ratio)
     const nativeAspect = nativeW / nativeH
     const containerAspect = rect.width / rect.height
 
@@ -75,33 +83,33 @@ export function useViewerMouse() {
     let renderH: number
 
     if (containerAspect > nativeAspect) {
-      // Letterboxed: height fills, width is limited
       renderH = rect.height
       renderW = renderH * nativeAspect
     } else {
-      // Pillarboxed: width fills, height is limited
       renderW = rect.width
       renderH = renderW / nativeAspect
     }
 
-    // Compute the offset where the video frame starts within the container
     const offsetX = (rect.width - renderW) / 2
     const offsetY = (rect.height - renderH) / 2
 
-    // Mouse position relative to the rendered video frame
-    const relX = Math.max(0, Math.min(1, (lastX - rect.left - offsetX) / renderW))
-    const relY = Math.max(0, Math.min(1, (lastY - rect.top - offsetY) / renderH))
+    const rawX = lastX - rect.left - offsetX
+    const rawY = lastY - rect.top - offsetY
+
+    const pixelX = Math.round(Math.max(0, Math.min(nativeW, rawX / renderW * nativeW)))
+    const pixelY = Math.round(Math.max(0, Math.min(nativeH, rawY / renderH * nativeH)))
 
     return {
-      absX: Math.round(relX * 4095),
-      absY: Math.round(relY * 4095),
+      pixelX,
+      pixelY,
+      absX: Math.round(pixelX / nativeW * 4095),
+      absY: Math.round(pixelY / nativeH * 4095),
     }
   }
 
   function requestPointerLock(): void {
     const target = videoEl.value
     if (target) {
-      console.log('[Mouse] requesting pointer lock')
       target.requestPointerLock()
     }
   }
@@ -124,8 +132,6 @@ export function useViewerMouse() {
 }
 
 function mapButton(browserButton: number): number {
-  // Browser: 0=left, 1=middle, 2=right
-  // CH9329: 1=left, 2=middle, 4=right
   const map: Record<number, number> = { 0: 1, 1: 4, 2: 2 }
   return map[browserButton] ?? 0
 }

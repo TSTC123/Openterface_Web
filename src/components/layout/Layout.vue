@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, provide, watchEffect, onMounted, onUnmounted } from 'vue'
+import { ref, watch, provide, watchEffect, onMounted, onUnmounted, computed } from 'vue'
 import TopBar from './TopBar.vue'
 import BottomBar from './BottomBar.vue'
 import StatusBar from './StatusBar.vue'
@@ -17,7 +17,7 @@ const emit = defineEmits<{
 }>()
 
 const detection = useBrowserDetection()
-const { deviceInfo, isConnected } = useSerial()
+const { state, connect, disconnect, deviceInfo, isConnected } = useSerial()
 const keyboard = useViewerKeyboard()
 const mouse = useViewerMouse()
 const media = useViewerMedia()
@@ -48,8 +48,6 @@ watch(isConnected, (connected) => {
 })
 
 // Provide keyboard/mouse state to child components for button styling
-provide('keyboardEnabled', keyboard.enabled)
-provide('mouseEnabled', mouse.enabled)
 
 function onVideoMouseMove(e: MouseEvent): void {
   mouse.handleMouseMove(e)
@@ -64,8 +62,8 @@ const {
   usbMode,
 } = useDeviceState()
 
-const mouseX = 0
-const mouseY = 0
+const mouseX = computed(() => Math.round(mouse.mouse.x))
+const mouseY = computed(() => Math.round(mouse.mouse.y))
 
 onMounted(async () => {
   try {
@@ -77,10 +75,31 @@ onMounted(async () => {
   }
 
   if (detection.mediaDevices) {
-    // Wait a tick for VideoStream to mount and set the video element
-    await new Promise(r => setTimeout(r, 100))
+    // Wait a bit for camera to stabilize before connecting
+    await new Promise(r => setTimeout(r, 500))
     console.log('[Layout] auto-connect, videoEl:', !!videoElRef.value)
     await media.connect(videoElRef.value)
+  }
+
+  // Auto-connect serial on page load
+  if (detection.fullSupport) {
+    const ports = await navigator.serial.getPorts()
+    if (ports.length > 0) {
+      console.log('[Layout] auto-connecting serial, existing port found')
+      connect()
+    } else {
+      // requestPort() requires a user gesture — defer to first interaction
+      console.log('[Layout] no existing serial port, will auto-connect on first user interaction')
+      const handler = () => {
+        connect()
+        document.removeEventListener('click', handler)
+        document.removeEventListener('keydown', handler)
+        document.removeEventListener('touchstart', handler)
+      }
+      document.addEventListener('click', handler, { once: true })
+      document.addEventListener('keydown', handler, { once: true })
+      document.addEventListener('touchstart', handler, { once: true })
+    }
   }
 
   if (!detection.fullSupport) {
@@ -103,6 +122,8 @@ onUnmounted(() => {
         @mouseup="mouse.handleMouseUp"
         @mousemove="onVideoMouseMove"
         @wheel="mouse.handleWheel"
+        :mouse-x="mouseX"
+        :mouse-y="mouseY"
       />
     </div>
     <StatusBar
@@ -110,8 +131,6 @@ onUnmounted(() => {
       :caps-lock="capsLock"
       :scroll-lock="scrollLock"
       :usb-mode="usbMode"
-      :mouse-x="mouseX"
-      :mouse-y="mouseY"
     />
     <BottomBar />
   </div>
