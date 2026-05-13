@@ -116,22 +116,27 @@ onUnmounted(() => {
 <template>
   <div class="flex flex-col h-screen w-screen overflow-hidden bg-slate-950">
     <TopBar />
-    <div class="flex-1 relative min-h-0">
-      <VideoStream
-        @mousedown="mouse.handleClick"
-        @mouseup="mouse.handleMouseUp"
-        @mousemove="onVideoMouseMove"
-        @wheel="mouse.handleWheel"
-        :mouse-x="mouseX"
-        :mouse-y="mouseY"
-      />
+    <div class="flex flex-1 min-h-0">
+      <div class="flex-1 min-h-0">
+        <VideoStream
+          @mousedown="mouse.handleClick"
+          @mouseup="mouse.handleMouseUp"
+          @mousemove="onVideoMouseMove"
+          @wheel="mouse.handleWheel"
+          :mouse-x="mouseX"
+          :mouse-y="mouseY"
+        />
+      </div>
+      <div class="flex flex-col w-12 shrink-0">
+        <StatusBar
+          :num-lock="numLock"
+          :caps-lock="capsLock"
+          :scroll-lock="scrollLock"
+          :usb-mode="usbMode"
+        />
+        <div class="w-5 h-px bg-slate-700 self-center my-1" />
+        <BottomBar />
+      </div>
     </div>
-    <StatusBar
-      :num-lock="numLock"
-      :caps-lock="capsLock"
-      :scroll-lock="scrollLock"
-      :usb-mode="usbMode"
-    />
-    <BottomBar />
   </div>
 </template>

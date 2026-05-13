@@ -45,7 +45,7 @@ const functionKeys = [
 </script>
 
 <template>
-  <div class="flex items-center gap-1">
+  <div class="flex flex-col items-center gap-1">
     <!-- Modifier Locks -->
     <button
       v-for="m in [
@@ -62,7 +62,7 @@ const functionKeys = [
       {{ m.label }}
     </button>
 
-    <div class="h-5 w-px bg-slate-700" />
+    <div class="w-5 h-px bg-slate-700" />
 
     <!-- Function Keys -->
     <button
