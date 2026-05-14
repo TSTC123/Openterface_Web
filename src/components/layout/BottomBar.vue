@@ -53,10 +53,10 @@ async function sendCtrlAltDel() {
 </script>
 
 <template>
-  <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-900 border-t border-slate-800 h-11 shrink-0 overflow-x-auto">
+  <div class="flex flex-col items-center gap-1 px-1.5 py-2 bg-slate-900 border-l border-slate-800 w-auto flex-1 min-h-0 overflow-y-auto">
 
     <!-- Power / Sleep / Wake -->
-    <div class="flex items-center gap-0.5 shrink-0">
+    <div class="flex flex-col items-center gap-0.5 shrink-0">
       <button @click="sendMedia(MEDIA_POWER)" :disabled="!isConnected" class="p-1.5 rounded hover:bg-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed text-red-400" title="Power">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
       </button>
@@ -68,17 +68,17 @@ async function sendCtrlAltDel() {
       </button>
     </div>
 
-    <div class="h-5 w-px bg-slate-700 shrink-0" />
+    <div class="w-5 h-px bg-slate-700 shrink-0" />
 
     <!-- Ctrl+Alt+Del -->
     <button @click="sendCtrlAltDel" :disabled="!isConnected" class="px-2 py-0.5 rounded text-xs font-mono font-bold hover:bg-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed text-red-400" title="Ctrl+Alt+Del">
       CAD
     </button>
 
-    <div class="h-5 w-px bg-slate-700 shrink-0" />
+    <div class="w-5 h-px bg-slate-700 shrink-0" />
 
     <!-- Transport Controls -->
-    <div class="flex items-center gap-0.5 shrink-0">
+    <div class="flex flex-col items-center gap-0.5 shrink-0">
       <button @click="sendMedia(MEDIA_PREV)" :disabled="!isConnected" class="p-1 rounded hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400" title="Previous Track">
         <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
       </button>
@@ -90,10 +90,10 @@ async function sendCtrlAltDel() {
       </button>
     </div>
 
-    <div class="h-5 w-px bg-slate-700 shrink-0" />
+    <div class="w-5 h-px bg-slate-700 shrink-0" />
 
     <!-- Volume Controls -->
-    <div class="flex items-center gap-0.5 shrink-0">
+    <div class="flex flex-col items-center gap-0.5 shrink-0">
       <button @click="sendMedia(MEDIA_VOL_DOWN)" :disabled="!isConnected" class="p-1 rounded hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400" title="Volume Down">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5L6 9H2v6h4l5 4V5zM19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
       </button>
@@ -105,7 +105,7 @@ async function sendCtrlAltDel() {
       </button>
     </div>
 
-    <div class="h-5 w-px bg-slate-700 shrink-0" />
+    <div class="w-5 h-px bg-slate-700 shrink-0" />
 
     <!-- Modifier Locks -->
     <ModifierLocks />
