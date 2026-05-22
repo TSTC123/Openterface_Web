@@ -43,10 +43,11 @@ export function useSerial() {
   const isConnected = computed(() => state.value === SerialState.Connected)
 
   /**
-   * Distinguish Gen2 vs Gen3 by checking for their WebHID capture chip.
-   * Both share serial PID 0xFE0C, so we probe the HID device store.
+   * Distinguish Gen2/Gen3/V3 by checking for their WebHID capture chip.
+   * All three share serial PID 0xFE0C, so we probe the HID device store.
+   * MS2130S (345F:2132) = Gen3, MS2109S (345F:2109) = V3, no HID = Gen2.
    */
-  async function detectGen2OrGen3(): Promise<void> {
+  async function detectGen2Gen3V3(): Promise<void> {
     const hid = getNavigatorHid()
     if (!hid) {
       // No WebHID API — default to Gen2 behavior (serial protocol)
@@ -59,11 +60,11 @@ export function useSerial() {
       for (const device of grantedDevices) {
         const kind = detectMs21xxKind(device)
         if (kind === 'MS2130S') {
-          generation.value = 'gen2'
+          generation.value = 'gen3'
           return
         }
         if (kind === 'MS2109S') {
-          generation.value = 'gen3'
+          generation.value = 'v3'
           return
         }
       }
@@ -72,15 +73,15 @@ export function useSerial() {
       for (const device of requestedDevices) {
         const kind = detectMs21xxKind(device)
         if (kind === 'MS2130S') {
-          generation.value = 'gen2'
-          return
-        }
-        if (kind === 'MS2109S') {
           generation.value = 'gen3'
           return
         }
+        if (kind === 'MS2109S') {
+          generation.value = 'v3'
+          return
+        }
       }
-      // User cancelled the HID picker — fall back to Gen2
+      // User cancelled the HID picker — fall back to Gen2 (serial-only)
       log('WebHID device selection cancelled or not granted; assuming Gen2')
       generation.value = 'gen2'
     } catch (err) {
@@ -124,11 +125,12 @@ export function useSerial() {
       if (info.usbProductId === GENERATIONS.GEN1.serialPid) {
         generation.value = 'gen1'
       } else if (info.usbProductId === GENERATIONS.GEN2.serialPid) {
-        // Gen2 and Gen3 share the same serial PID — distinguish via WebHID capture chip
-        await detectGen2OrGen3()
+        // Gen2, Gen3 and V3 share the same serial PID — distinguish via WebHID capture chip
+        await detectGen2Gen3V3()
       }
 
-      log(`Device generation: ${GENERATIONS[generation.value.toUpperCase() as keyof typeof GENERATIONS]?.label ?? generation.value}`)
+      const genLabel = GENERATIONS[generation.value.toUpperCase() as keyof typeof GENERATIONS]?.label ?? generation.value
+      log(`Device generation: ${genLabel}`)
 
       let baud: number
       if (baudrate.value > 0) {
@@ -151,8 +153,9 @@ export function useSerial() {
       if (generation.value === 'gen1') {
         log('Gen1: serial CMD_SWITCH_USB not available; USB mode via MS2109 WebHID')
         await ensureUsbModeHid(allowHidPrompt)
-      } else if (generation.value === 'gen3') {
-        log('Gen3: USB mode via MS2109S WebHID')
+      } else if (generation.value === 'gen3' || generation.value === 'v3') {
+        const chip = generation.value === 'gen3' ? 'MS2130S' : 'MS2109S'
+        log(`${generation.value.toUpperCase()} (${chip}): USB mode via WebHID`)
         await ensureUsbModeHid(allowHidPrompt)
       } else {
         log('Gen2: using 9600 baud, USB mode via serial 0x97 protocol')
@@ -190,7 +193,7 @@ export function useSerial() {
 
     if (writer) {
       try {
-        await writer.releaseLock()
+        writer.releaseLock()
       } catch {
         /* ignore */
       }
@@ -458,7 +461,7 @@ export function useSerial() {
   }
 
   async function requestUsbModeHidPermission(): Promise<boolean> {
-    if (generation.value !== 'gen1' && generation.value !== 'gen3') {
+    if (generation.value !== 'gen1' && generation.value !== 'gen3' && generation.value !== 'v3') {
       return false
     }
 
@@ -497,7 +500,7 @@ export function useSerial() {
   }
 
   async function ensureUsbModeHid(allowPrompt: boolean): Promise<boolean> {
-    if (generation.value !== 'gen1' && generation.value !== 'gen3') {
+    if (generation.value !== 'gen1' && generation.value !== 'gen3' && generation.value !== 'v3') {
       return false
     }
 

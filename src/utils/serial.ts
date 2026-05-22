@@ -43,7 +43,12 @@ export const enum ResponseCommand {
   RESP_SEND_MS_REL_DATA = 0x85,
 }
 
-/** Openterface hardware generations — aligned with Qt project DeviceConstants */
+/**
+ * Openterface hardware generations — aligned with Qt project DeviceConstants.
+ *
+ * Gen2 (KVM Go) and Gen3 share serial PID 0xFE0C (CH32V208). They are
+ * distinguished by the paired capture HID device: MS2130S = Gen3, MS2109S = V3.
+ */
 export const GENERATIONS = {
   GEN1: {
     label: 'Gen1',
@@ -66,7 +71,17 @@ export const GENERATIONS = {
     usbModeBackend: 'serial' as const,
   },
   GEN3: {
-    label: 'Gen3',
+    label: 'Gen3 (USB 3.0)',
+    serialVid: 0x1a86,
+    serialPid: 0xfe0c,
+    captureVid: 0x345f,
+    capturePid: 0x2132,
+    hidChip: 'MS2130S' as const,
+    baudrate: 9600,
+    usbModeBackend: 'hid' as const,
+  },
+  V3: {
+    label: 'V3 (USB 3.0)',
     serialVid: 0x1a86,
     serialPid: 0xfe0c,
     captureVid: 0x345f,
@@ -83,11 +98,11 @@ export const USB = {
   VID: 0x1a86,
   /** Gen1 serial product ID */
   GEN1_SERIAL_PID: 0x7523,
-  /** Gen2/Gen3 serial product ID */
+  /** Gen2/Gen3/V3 serial product ID (CH32V208) */
   GEN23_SERIAL_PID: 0xfe0c,
   /** Gen1 baudrate */
   GEN1_BAUDRATE: 115200,
-  /** Gen2/Gen3 baudrate */
+  /** Gen2/Gen3/V3 baudrate */
   GEN23_BAUDRATE: 9600,
   /** @deprecated use GENERATIONS.GEN1.serialPid */
   MINIKVM_PID: 0x7523,

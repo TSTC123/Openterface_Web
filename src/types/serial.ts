@@ -4,7 +4,7 @@ export enum SerialState {
   Connected = 'connected',
 }
 
-export type DeviceGeneration = 'gen1' | 'gen2' | 'gen3' | 'unknown'
+export type DeviceGeneration = 'gen1' | 'gen2' | 'gen3' | 'v3' | 'unknown'
 
 export const enum SerialCommand {
   CMD_GET_INFO = 0x01,
