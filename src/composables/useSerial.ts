@@ -309,9 +309,9 @@ export function useSerial() {
       const version = frame[5].toString(16)
       const targetConnected = frame[6] === 1
       const lockByte = frame[7]
-      const scrollLock = (lockByte & 0x01) !== 0
+      const numLock = (lockByte & 0x01) !== 0
       const capsLock = (lockByte & 0x02) !== 0
-      const numLock = (lockByte & 0x04) !== 0
+      const scrollLock = (lockByte & 0x04) !== 0
 
       deviceInfo.value = {
         firmwareVersion: `1.${version}`,
