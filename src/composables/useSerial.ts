@@ -2,7 +2,7 @@
 
 import { ref, computed } from 'vue'
 import { SerialState, type DeviceInfo, type DeviceGeneration } from '../types/serial'
-import { GENERATIONS, FrameParser, Command, hexDump } from '../utils/serial'
+import { GENERATIONS, FrameParser, Command, hexDump, USB } from '../utils/serial'
 import {
   detectMs21xxKind,
   ensureMs21xxHidOpen,
@@ -119,13 +119,17 @@ export function useSerial() {
 
       const info = serialPort.value.getInfo()
       usbProductId.value = info.usbProductId ?? null
+      log(`=== Serial Device Detection ===`)
+      log(`USB Vendor ID: 0x${info.usbVendorId?.toString(16) ?? 'unknown'}`)
       log(`USB Product ID: 0x${info.usbProductId?.toString(16) ?? 'unknown'}`)
 
       // Determine generation from serial product ID, then refine via WebHID for Gen2/Gen3
       if (info.usbProductId === GENERATIONS.GEN1.serialPid) {
         generation.value = 'gen1'
+        log(`Detected GEN1 serial chip (PID: 0x${GENERATIONS.GEN1.serialPid.toString(16)}) - CH9329`)
       } else if (info.usbProductId === GENERATIONS.GEN2.serialPid) {
         // Gen2, Gen3 and V3 share the same serial PID — distinguish via WebHID capture chip
+        log(`Detected GEN2/GEN3/V3 serial chip (PID: 0x${GENERATIONS.GEN2.serialPid.toString(16)}) - CH32V208`)
         await detectGen2Gen3V3()
       }
 
@@ -133,16 +137,24 @@ export function useSerial() {
       log(`Device generation: ${genLabel}`)
 
       let baud: number
+      log(`=== Baudrate Configuration ===`)
       if (baudrate.value > 0) {
         baud = baudrate.value
+        log(`Using manual baudrate: ${baud}`)
       } else if (generation.value === 'gen1') {
         baud = GENERATIONS.GEN1.baudrate
+        log(`GEN1 configured baudrate: ${baud} (expected: ${USB.GEN1_BAUDRATE})`)
+        if (baud !== USB.GEN1_BAUDRATE) {
+          log(`⚠️  WARNING: GEN1 baudrate mismatch! Current=${baud}, CH9329 chip requires=${USB.GEN1_BAUDRATE}`)
+        }
       } else {
         baud = GENERATIONS.GEN2.baudrate
+        log(`GEN2/GEN3/V3 configured baudrate: ${baud} (CH32V208 chip)`)
       }
 
+      log(`Opening serial port at ${baud} baud...`)
       await serialPort.value.open({ baudRate: baud })
-      log(`Connected at ${baud} baud`)
+      log(`✓ Serial port connected: ${baud} baud`)
       baudrate.value = baud
 
       writer = serialPort.value.writable!.getWriter()

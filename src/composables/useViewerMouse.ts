@@ -1,9 +1,15 @@
-import { ref, reactive } from 'vue'
+import { ref, reactive, onUnmounted } from 'vue'
 import { useSerial } from './useSerial'
 import { useInputSettings } from './useInputSettings'
 import { useSerialCommands } from './useSerialCommands'
 
 type ContainerRect = { left: number; top: number; width: number; height: number }
+
+type PendingMouseMoveData = {
+  clientX: number
+  clientY: number
+  containerRect: ContainerRect | null
+}
 
 type ViewportMetrics = {
   rect: ContainerRect
@@ -45,12 +51,26 @@ export function useViewerMouse() {
   let lastContentPixelX = 0
   let lastContentPixelY = 0
 
+  // ── Throttling state (single-shot, matches Qt QTimer::singleShot pattern) ──
+  let pendingMouseMove: PendingMouseMoveData | null = null
+  let mouseMoveTimer: ReturnType<typeof setTimeout> | null = null
+  let droppedMouseEvents = 0
+
   const { isConnected } = useSerial()
-  const { mouseSensitivity, mouseMode } = useInputSettings()
+  const { mouseSensitivity, mouseMode, mouseMoveInterval } = useInputSettings()
   const {
     sendMouseAbsolute: serialSendMouseAbs,
     sendMouseRelative: serialSendMouseRel,
   } = useSerialCommands()
+
+  // Cleanup pending timer on unmount
+  onUnmounted(() => {
+    if (mouseMoveTimer) {
+      clearTimeout(mouseMoveTimer)
+      mouseMoveTimer = null
+    }
+    pendingMouseMove = null
+  })
 
   function handleClick(e: MouseEvent): void {
     e.preventDefault()
@@ -123,7 +143,6 @@ export function useViewerMouse() {
   }
 
   function handleMouseMove(e: MouseEvent): void {
-    updatePosition(e)
     if (!enabled.value || !isConnected.value) {
       console.warn('[Mouse] move BLOCKED: enabled=', enabled.value, 'isConnected=', isConnected.value)
       return
@@ -131,14 +150,54 @@ export function useViewerMouse() {
     e.preventDefault()
     e.stopPropagation()
 
+    // Throttling: store latest event, replace pending one (matches Qt pattern)
+    const container = e.currentTarget instanceof HTMLElement
+      ? e.currentTarget
+      : videoEl.value?.parentElement
+    const containerRect = container ? toContainerRect(container.getBoundingClientRect()) : null
+
+    if (pendingMouseMove) {
+      droppedMouseEvents++
+    }
+    pendingMouseMove = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      containerRect,
+    }
+
+    // Start single-shot timer if not already running
+    if (!mouseMoveTimer) {
+      mouseMoveTimer = setTimeout(processPendingMouseMove, mouseMoveInterval.value)
+    }
+  }
+
+  function processPendingMouseMove(): void {
+    mouseMoveTimer = null
+    if (!pendingMouseMove) return
+
+    const { clientX, clientY, containerRect } = pendingMouseMove
+    pendingMouseMove = null
+
+    // Restore cached rect
+    if (containerRect) {
+      lastContainerRect = containerRect
+    }
+    lastX = clientX
+    lastY = clientY
+
     const metrics = getViewportMetrics()
     if (!metrics) {
+      console.warn('[Mouse] processPendingMouseMove dropped: viewport metrics unavailable', {
+        videoEl: !!videoEl.value,
+        videoSize: videoEl.value ? `${videoEl.value.videoWidth}x${videoEl.value.videoHeight}` : 'N/A',
+        lastContainerRect: !!lastContainerRect,
+      })
       wasInsideContent = false
       return
     }
 
     const currentCoords = getCoordsForClientPoint(lastX, lastY, metrics)
-    logViewportMetrics('mousemove', metrics, currentCoords, lastX, lastY)
+    logViewportMetrics('mousemove-throttled', metrics, currentCoords, lastX, lastY)
 
     if (!currentCoords.insideContent) {
       wasInsideContent = false

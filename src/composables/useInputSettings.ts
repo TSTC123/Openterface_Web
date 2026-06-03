@@ -6,16 +6,24 @@ const defaultMouseSensitivity = 1
 const minMouseSensitivity = 0.2
 const maxMouseSensitivity = 2
 const defaultMouseMode = 'absolute'
+const defaultMouseMoveInterval = 8   // 8ms ≈ 125 FPS (matches Qt default)
+const minMouseMoveInterval = 4       // 4ms ≈ 250 FPS
+const maxMouseMoveInterval = 33      // 33ms ≈ 30 FPS
 
 export type MouseMode = 'absolute' | 'relative'
 
 interface StoredInputSettings {
   mouseSensitivity?: number
   mouseMode?: MouseMode
+  mouseMoveInterval?: number
 }
 
 function clampMouseSensitivity(value: number): number {
   return Math.min(maxMouseSensitivity, Math.max(minMouseSensitivity, value))
+}
+
+function clampMouseMoveInterval(value: number): number {
+  return Math.min(maxMouseMoveInterval, Math.max(minMouseMoveInterval, value))
 }
 
 function normalizeMouseMode(value: unknown): MouseMode {
@@ -48,6 +56,7 @@ function persistSettings(): void {
   const settings: StoredInputSettings = {
     mouseSensitivity: mouseSensitivity.value,
     mouseMode: mouseMode.value,
+    mouseMoveInterval: mouseMoveInterval.value,
   }
 
   window.localStorage.setItem(INPUT_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
@@ -58,6 +67,9 @@ const mouseSensitivity = ref(
   clampMouseSensitivity(storedSettings.mouseSensitivity ?? defaultMouseSensitivity),
 )
 const mouseMode = ref<MouseMode>(normalizeMouseMode(storedSettings.mouseMode ?? defaultMouseMode))
+const mouseMoveInterval = ref(
+  clampMouseMoveInterval(storedSettings.mouseMoveInterval ?? defaultMouseMoveInterval),
+)
 
 export function useInputSettings() {
   function setMouseSensitivity(nextValue: number): void {
@@ -79,15 +91,35 @@ export function useInputSettings() {
     persistSettings()
   }
 
+  function setMouseMoveInterval(nextValue: number): void {
+    if (!Number.isFinite(nextValue)) {
+      return
+    }
+
+    mouseMoveInterval.value = clampMouseMoveInterval(nextValue)
+    persistSettings()
+  }
+
+  function resetMouseMoveInterval(): void {
+    mouseMoveInterval.value = defaultMouseMoveInterval
+    persistSettings()
+  }
+
   return {
     mouseSensitivity,
     mouseMode,
+    mouseMoveInterval,
     setMouseSensitivity,
     setMouseMode,
+    setMouseMoveInterval,
     resetMouseSensitivity,
+    resetMouseMoveInterval,
     defaultMouseSensitivity,
     minMouseSensitivity,
     maxMouseSensitivity,
     defaultMouseMode,
+    defaultMouseMoveInterval,
+    minMouseMoveInterval,
+    maxMouseMoveInterval,
   }
 }
