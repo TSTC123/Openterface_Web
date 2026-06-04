@@ -15,6 +15,15 @@ export interface Ms21xxUsbModeDetails {
   usedGpio0Fallback: boolean
 }
 
+export interface Ms21xxVideoStatus {
+  hdmiConnected: boolean
+  width: number
+  height: number
+  fpsRaw: number
+  pixelClockKhzRaw: number
+  chipKind: Ms21xxKind
+}
+
 export interface Ms21xxWebHidDevice {
   vendorId: number
   productId: number
@@ -42,6 +51,15 @@ interface RegisterSet {
   gpio0: number
   spdifout: number
   firmwareVersion: [number, number, number, number]
+  hdmiStatus: number
+  widthH: number
+  widthL: number
+  heightH: number
+  heightL: number
+  fpsH: number
+  fpsL: number
+  pixelClockH: number
+  pixelClockL: number
 }
 
 const XDATA_READ_COMMAND = 0xb5
@@ -99,16 +117,43 @@ const REGISTER_SETS: Record<Ms21xxKind, RegisterSet> = {
     gpio0: 0xdf00,
     spdifout: 0xdf01,
     firmwareVersion: [0xcbdc, 0xcbdd, 0xcbde, 0xcbdf],
+    hdmiStatus: 0xFA8C,
+    widthH: 0xC6AF,
+    widthL: 0xC6B0,
+    heightH: 0xC6B1,
+    heightL: 0xC6B2,
+    fpsH: 0xC6B5,
+    fpsL: 0xC6B6,
+    pixelClockH: 0xC73C,
+    pixelClockL: 0xC73D,
   },
   MS2109S: {
     gpio0: 0x0000,
     spdifout: 0x0000,
     firmwareVersion: [0xcbdc, 0xcbdd, 0xcbde, 0xcbdf],
+    hdmiStatus: 0xFD9C,
+    widthH: 0xC703,
+    widthL: 0xC704,
+    heightH: 0xC705,
+    heightL: 0xC706,
+    fpsH: 0xC617,
+    fpsL: 0xC618,
+    pixelClockH: 0xC8C5,
+    pixelClockL: 0xC8C6,
   },
   MS2130S: {
     gpio0: 0xdf00,
     spdifout: 0xdf01,
     firmwareVersion: [0x1fdc, 0x1fdd, 0x1fde, 0x1fdf],
+    hdmiStatus: 0xFA8D,
+    widthH: 0x1CFC,
+    widthL: 0x1CFD,
+    heightH: 0x1CFE,
+    heightL: 0x1CFF,
+    fpsH: 0x1D02,
+    fpsL: 0x1D03,
+    pixelClockH: 0x1D00,
+    pixelClockL: 0x1D01,
   },
 }
 
@@ -232,6 +277,42 @@ function buildWriteStrategies(bits: { enabledBit: number; clearMask: number; fir
   }
 
   return [primary]
+}
+
+export async function readMs21xxVideoStatus(device: Ms21xxWebHidDevice): Promise<Ms21xxVideoStatus | null> {
+  const kind = requireMs21xxKind(device)
+  const registers = REGISTER_SETS[kind]
+
+  await ensureMs21xxHidOpen(device)
+
+  try {
+    const hdmiByte = await readRegister(device, kind, registers.hdmiStatus)
+    const hdmiConnected = (hdmiByte & 0x01) !== 0
+
+    const widthH = await readRegister(device, kind, registers.widthH)
+    const widthL = await readRegister(device, kind, registers.widthL)
+    const heightH = await readRegister(device, kind, registers.heightH)
+    const heightL = await readRegister(device, kind, registers.heightL)
+    const fpsH = await readRegister(device, kind, registers.fpsH)
+    const fpsL = await readRegister(device, kind, registers.fpsL)
+    const pclkH = await readRegister(device, kind, registers.pixelClockH)
+    const pclkL = await readRegister(device, kind, registers.pixelClockL)
+
+    const width = (widthH << 8) | widthL
+    const height = (heightH << 8) | heightL
+
+    // Raw register values: fps × 100, pixel_clock_khz × 100
+    // UI displays by dividing by 100: e.g. raw 6000 → 60 fps, raw 14850 → 148.5 MHz
+    const fpsRaw = (fpsH << 8) | fpsL
+    const pixelClockKhzRaw = (pclkH << 8) | pclkL
+
+    log(`[Video Status] chip=${kind} | HDMI=${hdmiConnected} | widthH=0x${widthH.toString(16)} widthL=0x${widthL.toString(16)} width=${width} | heightH=0x${heightH.toString(16)} heightL=0x${heightL.toString(16)} height=${height} | fpsH=0x${fpsH.toString(16)} fpsL=0x${fpsL.toString(16)} fpsRaw=${fpsRaw} | pclkH=0x${pclkH.toString(16)} pclkL=0x${pclkL.toString(16)} pclkRaw=${pixelClockKhzRaw}`)
+
+    return { hdmiConnected, width, height, fpsRaw: fpsRaw, pixelClockKhzRaw: pixelClockKhzRaw, chipKind: kind }
+  } catch (err) {
+    log(`Video status read failed: ${err}`)
+    return null
+  }
 }
 
 async function tryReadFirmwareVersionCode(device: Ms21xxWebHidDevice, kind: Ms21xxKind): Promise<number | null> {

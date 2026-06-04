@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { ref, inject, onMounted, onUnmounted, Ref } from 'vue'
+import { ref, inject, onMounted, onUnmounted, Ref, watch } from 'vue'
 import { useViewerMedia } from '../../composables/useViewerMedia'
 import { useSerial } from '../../composables/useSerial'
+import { useVideoStatus } from '../../composables/useVideoStatus'
+import { SerialState } from '../../types/serial'
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 const isFullscreen = ref(false)
 
 const media = useViewerMedia()
 const serial = useSerial()
+const videoStatus = useVideoStatus()
 
 const showBaudPopup = ref(false)
 
@@ -38,6 +41,18 @@ const props = defineProps<{
 
 defineExpose({ videoRef })
 
+// Start video status polling when serial is connected
+let wasConnected = false
+watch(() => serial.state.value, (newState) => {
+  if (newState === SerialState.Connected) {
+    videoStatus.startPolling()
+    wasConnected = true
+  } else if (wasConnected) {
+    videoStatus.stopPolling()
+    wasConnected = false
+  }
+}, { immediate: true })
+
 onMounted(() => {
   if (videoElRef) {
     videoElRef.value = videoRef.value
@@ -47,6 +62,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  videoStatus.stopPolling()
 })
 
 function handleClickOutside(e: MouseEvent) {
@@ -113,12 +129,24 @@ function toggleFullscreen(): void {
       </span>
       <span
         class="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-slate-800/80 text-slate-300 pointer-events-none"
+        :class="videoStatus.hdmiConnected.value ? 'bg-blue-800/80 text-blue-300' : 'bg-slate-800/80 text-slate-400'"
       >
         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
         </svg>
-        <span v-if="media.currentSettings.value?.width && media.currentSettings.value?.height">
-          {{ media.currentSettings.value.width }}×{{ media.currentSettings.value.height }}
+        <span v-if="videoStatus.width.value && videoStatus.height.value">
+          {{ videoStatus.width.value }}×{{ videoStatus.height.value }} @ {{ Math.round(videoStatus.fpsRaw.value / 100) }}fps
+        </span>
+        <span v-else>—</span>
+      </span>
+      <span
+        class="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-slate-800/80 text-slate-300 pointer-events-none"
+      >
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        <span v-if="videoStatus.pixelClockKhzRaw.value">
+          {{ (videoStatus.pixelClockKhzRaw.value / 100).toFixed(1) }} MHz
         </span>
         <span v-else>—</span>
       </span>

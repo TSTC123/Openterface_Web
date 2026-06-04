@@ -613,5 +613,6 @@ export function useSerial() {
     queryUsbStatus,
     setUsbMode,
     requestUsbModeHidPermission,
+    getUsbModeHidDevice: () => usbModeHidDevice.value,
   }
 }
