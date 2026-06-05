@@ -4,7 +4,8 @@
   "version": "0.2.0",
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "submodules/Openterface_WebUI/packages/*"
   ],
   "scripts": {
     "dev:usb": "npm -w @openterface/usb run dev",
