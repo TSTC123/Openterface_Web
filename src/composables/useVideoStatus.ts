@@ -43,16 +43,8 @@ async function tryGetMs2109sHid(): Promise<Ms21xxWebHidDevice | null> {
         return device
       }
     }
-
-    // No granted device — try to request one
-    const requestedDevices = (await hid.requestDevice({ filters: [MS2109S_FILTER] })) as Ms21xxWebHidDevice[]
-    for (const device of requestedDevices) {
-      if (device.vendorId === MS2109S_FILTER.vendorId && device.productId === MS2109S_FILTER.productId) {
-        return device
-      }
-    }
   } catch (err) {
-    console.warn('[VideoStatus] HID request failed:', err)
+    console.warn('[VideoStatus] getDevices failed:', err)
   }
 
   return null
