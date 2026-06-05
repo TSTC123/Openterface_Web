@@ -3,6 +3,7 @@ import { ref, inject, onMounted, onUnmounted, Ref, watch } from 'vue'
 import { useViewerMedia } from '../../composables/useViewerMedia'
 import { useSerial } from '../../composables/useSerial'
 import { useVideoStatus } from '../../composables/useVideoStatus'
+import { useVideoOverlaySettings } from '../../composables/useVideoOverlaySettings'
 import { SerialState } from '../../types/serial'
 
 const videoRef = ref<HTMLVideoElement | null>(null)
@@ -11,6 +12,7 @@ const isFullscreen = ref(false)
 const media = useViewerMedia()
 const serial = useSerial()
 const videoStatus = useVideoStatus()
+const overlaySettings = useVideoOverlaySettings()
 
 const showBaudPopup = ref(false)
 
@@ -115,10 +117,18 @@ function toggleFullscreen(): void {
 
     <!-- Resolution Badge -->
     <div
+      v-if="overlaySettings.showMouseStatus.value ||
+            overlaySettings.showResolution.value ||
+            overlaySettings.showPixelClock.value ||
+            overlaySettings.showBaudRate.value ||
+            overlaySettings.showTargetMousePosition.value ||
+            overlaySettings.showPointerPosition.value ||
+            overlaySettings.showCenterButton.value"
       class="absolute top-2 right-2 flex flex-col items-end gap-1"
     >
       <!-- Mouse Status Indicator -->
       <span
+        v-if="overlaySettings.showMouseStatus.value"
         class="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium pointer-events-none"
         :class="mouseEnabled ? 'bg-green-800/80 text-green-300' : 'bg-red-800/80 text-red-300'"
       >
@@ -128,6 +138,7 @@ function toggleFullscreen(): void {
         Mouse {{ mouseEnabled ? 'ON' : 'OFF' }}
       </span>
       <span
+        v-if="overlaySettings.showResolution.value"
         class="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-slate-800/80 text-slate-300 pointer-events-none"
         :class="videoStatus.hdmiConnected.value ? 'bg-blue-800/80 text-blue-300' : 'bg-slate-800/80 text-slate-400'"
       >
@@ -140,6 +151,7 @@ function toggleFullscreen(): void {
         <span v-else>—</span>
       </span>
       <span
+        v-if="overlaySettings.showPixelClock.value"
         class="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-slate-800/80 text-slate-300 pointer-events-none"
       >
         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -151,7 +163,7 @@ function toggleFullscreen(): void {
         <span v-else>—</span>
       </span>
       <div
-        v-if="serial.baudrate.value > 0"
+        v-if="overlaySettings.showBaudRate.value && serial.baudrate.value > 0"
         class="relative"
       >
         <button
@@ -182,19 +194,19 @@ function toggleFullscreen(): void {
         </div>
       </div>
       <span
-        v-if="media.currentSettings.value?.width && media.currentSettings.value?.height"
+        v-if="overlaySettings.showTargetMousePosition.value && media.currentSettings.value?.width && media.currentSettings.value?.height"
         class="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-slate-800/80 text-slate-300 pointer-events-none"
       >
         Target X: {{ props.targetMouseReady ? props.targetMouseX : '—' }}, Y: {{ props.targetMouseReady ? props.targetMouseY : '—' }}
       </span>
       <span
-        v-if="media.currentSettings.value?.width && media.currentSettings.value?.height"
+        v-if="overlaySettings.showPointerPosition.value && media.currentSettings.value?.width && media.currentSettings.value?.height"
         class="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-slate-800/80 text-slate-400 pointer-events-none"
       >
         Pointer X: {{ props.mouseX }}, Y: {{ props.mouseY }}
       </span>
       <button
-        v-if="media.currentSettings.value?.width && media.currentSettings.value?.height"
+        v-if="overlaySettings.showCenterButton.value && media.currentSettings.value?.width && media.currentSettings.value?.height"
         @click.stop="emit('center-mouse')"
         @mousedown.stop
         @mouseup.stop

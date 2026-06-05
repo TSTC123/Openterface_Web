@@ -3,15 +3,18 @@ import { ref } from 'vue'
 import { useViewerMedia, CAMERA_RESOLUTIONS } from '../../composables/useViewerMedia'
 import { useSerial } from '../../composables/useSerial'
 import { useInputSettings } from '../../composables/useInputSettings'
+import { useVideoOverlaySettings } from '../../composables/useVideoOverlaySettings'
 
 const emit = defineEmits<{ close: [] }>()
 
 const pasteDelay = ref(30)
 const showAllDevices = ref(false)
+const showOverlaySettings = ref(false)
 
 const media = useViewerMedia()
 const serial = useSerial()
 const { mouseMode, setMouseMode } = useInputSettings()
+const overlaySettings = useVideoOverlaySettings()
 
 async function applyResolution(res: typeof CAMERA_RESOLUTIONS[number]): Promise<void> {
   await media.applySettings({ width: res.width, height: res.height })
@@ -20,6 +23,10 @@ async function applyResolution(res: typeof CAMERA_RESOLUTIONS[number]): Promise<
 function forgetDevices(): void {
   localStorage.removeItem('serial-port-selected')
   emit('close')
+}
+
+function resetOverlaySettings(): void {
+  overlaySettings.resetAll()
 }
 </script>
 
@@ -116,6 +123,102 @@ function forgetDevices(): void {
             <span class="text-sm font-medium text-slate-300">Serial Console Logging</span>
           </label>
           <p class="text-xs text-slate-500 mt-1">Print serial protocol frames to browser console</p>
+        </div>
+
+        <!-- Video Overlay Settings -->
+        <div class="pt-4 border-t border-slate-800">
+          <button
+            @click="showOverlaySettings = !showOverlaySettings"
+            class="flex items-center justify-between w-full group"
+          >
+            <span class="text-sm font-medium text-slate-300">Video Overlay Settings</span>
+            <svg
+              class="w-4 h-4 text-slate-500 transition-transform group-hover:text-slate-400"
+              :class="showOverlaySettings ? 'rotate-180' : ''"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <p class="text-xs text-slate-500 mt-1">Control visibility of video overlay indicators</p>
+
+          <div v-if="showOverlaySettings" class="mt-4 space-y-3 pl-1">
+            <!-- Toggle All -->
+            <label class="flex items-center gap-2 border-b border-slate-800 pb-2 mb-1">
+              <input
+                type="checkbox"
+                class="rounded border-slate-700 bg-slate-800 text-orange-500 w-4 h-4 cursor-pointer"
+                :checked="overlaySettings.allEnabled.value"
+                :indeterminate.prop="!overlaySettings.allEnabled.value && overlaySettings.someEnabled.value"
+                @change="overlaySettings.toggleAll()"
+              />
+              <span class="text-sm font-medium text-white">Show All Overlays</span>
+            </label>
+            <label class="flex items-center gap-2">
+              <input
+                v-model="overlaySettings.showMouseStatus.value"
+                type="checkbox"
+                class="rounded border-slate-700 bg-slate-800 text-orange-500 w-4 h-4"
+              />
+              <span class="text-sm text-slate-400">Show Mouse Status</span>
+            </label>
+            <label class="flex items-center gap-2">
+              <input
+                v-model="overlaySettings.showResolution.value"
+                type="checkbox"
+                class="rounded border-slate-700 bg-slate-800 text-orange-500 w-4 h-4"
+              />
+              <span class="text-sm text-slate-400">Show Resolution</span>
+            </label>
+            <label class="flex items-center gap-2">
+              <input
+                v-model="overlaySettings.showPixelClock.value"
+                type="checkbox"
+                class="rounded border-slate-700 bg-slate-800 text-orange-500 w-4 h-4"
+              />
+              <span class="text-sm text-slate-400">Show Pixel Clock</span>
+            </label>
+            <label class="flex items-center gap-2">
+              <input
+                v-model="overlaySettings.showBaudRate.value"
+                type="checkbox"
+                class="rounded border-slate-700 bg-slate-800 text-orange-500 w-4 h-4"
+              />
+              <span class="text-sm text-slate-400">Show Baud Rate</span>
+            </label>
+            <label class="flex items-center gap-2">
+              <input
+                v-model="overlaySettings.showTargetMousePosition.value"
+                type="checkbox"
+                class="rounded border-slate-700 bg-slate-800 text-orange-500 w-4 h-4"
+              />
+              <span class="text-sm text-slate-400">Show Target Mouse Position</span>
+            </label>
+            <label class="flex items-center gap-2">
+              <input
+                v-model="overlaySettings.showPointerPosition.value"
+                type="checkbox"
+                class="rounded border-slate-700 bg-slate-800 text-orange-500 w-4 h-4"
+              />
+              <span class="text-sm text-slate-400">Show Pointer Position</span>
+            </label>
+            <label class="flex items-center gap-2">
+              <input
+                v-model="overlaySettings.showCenterButton.value"
+                type="checkbox"
+                class="rounded border-slate-700 bg-slate-800 text-orange-500 w-4 h-4"
+              />
+              <span class="text-sm text-slate-400">Show Center Button</span>
+            </label>
+            <button
+              @click="resetOverlaySettings()"
+              class="mt-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors"
+            >
+              Reset to Defaults
+            </button>
+          </div>
         </div>
 
         <!-- Danger Zone -->
