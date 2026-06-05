@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue'
 import { HIDTransportKey, useHidCommands } from '@openterface/core'
-import { useDeviceState } from '../composables/useDeviceState'
+import { useDeviceState } from '../../composables/useDeviceState'
 
 const transport = inject(HIDTransportKey)!
 const { switchUsbToHost, switchUsbToTarget } = useHidCommands()

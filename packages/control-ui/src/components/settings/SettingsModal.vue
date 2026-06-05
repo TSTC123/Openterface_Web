@@ -1,25 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useViewerMedia, CAMERA_RESOLUTIONS } from '../../composables/useViewerMedia'
-import { useSerial } from '../../composables/useSerial'
+import { ref, inject } from 'vue'
+import { HIDTransportKey } from '@openterface/core'
 
 const emit = defineEmits<{ close: [] }>()
 
+const transport = inject(HIDTransportKey)!
 const mouseMode = ref<'absolute' | 'relative'>('absolute')
 const pasteDelay = ref(30)
-const showAllDevices = ref(false)
-
-const media = useViewerMedia()
-const serial = useSerial()
-
-async function applyResolution(res: typeof CAMERA_RESOLUTIONS[number]): Promise<void> {
-  await media.applySettings({ width: res.width, height: res.height })
-}
-
-function forgetDevices(): void {
-  localStorage.removeItem('serial-port-selected')
-  emit('close')
-}
 </script>
 
 <template>
@@ -35,36 +22,16 @@ function forgetDevices(): void {
       </div>
 
       <div class="space-y-5">
-        <!-- Camera -->
+        <!-- Connection Status -->
         <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Camera Device</label>
-          <select
-            v-model="media.selectedDevice.value"
-            @change="media.changeDevice(media.selectedDevice.value)"
-            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
-          >
-            <option v-for="d in media.devices.value" :key="d.deviceId" :value="d.deviceId">
-              {{ d.label || d.deviceId }}
-            </option>
-          </select>
-          <label class="flex items-center gap-2 mt-2">
-            <input v-model="showAllDevices" type="checkbox" class="rounded border-slate-700 bg-slate-800 text-orange-500" />
-            <span class="text-xs text-slate-500">Show all video devices</span>
-          </label>
-        </div>
-
-        <!-- Resolution -->
-        <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Resolution</label>
-          <div class="grid grid-cols-2 gap-2">
-            <button
-              v-for="res in CAMERA_RESOLUTIONS"
-              :key="res.label"
-              @click="applyResolution(res)"
-              class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Connection Status</label>
+          <div class="flex items-center gap-2">
+            <span
+              class="px-2 py-1 rounded text-xs font-medium"
+              :class="transport.isConnected.value ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'"
             >
-              {{ res.label }}
-            </button>
+              {{ transport.state.value }}
+            </span>
           </div>
         </div>
 
@@ -104,27 +71,13 @@ function forgetDevices(): void {
           </div>
         </div>
 
-        <!-- Serial Logging -->
-        <div>
-          <label class="flex items-center gap-2">
-            <input
-              v-model="serial.logEnabled.value"
-              type="checkbox"
-              class="rounded border-slate-700 bg-slate-800 text-orange-500 w-4 h-4"
-            />
-            <span class="text-sm font-medium text-slate-300">Serial Console Logging</span>
-          </label>
-          <p class="text-xs text-slate-500 mt-1">Print serial protocol frames to browser console</p>
-        </div>
-
-        <!-- Danger Zone -->
-        <div class="pt-4 border-t border-slate-800">
-          <button
-            @click="forgetDevices()"
-            class="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
-          >
-            Forget Saved Devices
-          </button>
+        <!-- Device Info -->
+        <div v-if="transport.deviceInfo.value">
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Device Info</label>
+          <div class="text-xs text-slate-400 space-y-1">
+            <p>Firmware: {{ transport.deviceInfo.value.firmwareVersion }}</p>
+            <p>Target: {{ transport.deviceInfo.value.targetConnected ? 'Connected' : 'Disconnected' }}</p>
+          </div>
         </div>
       </div>
     </div>
