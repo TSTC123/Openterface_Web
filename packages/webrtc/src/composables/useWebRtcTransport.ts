@@ -44,7 +44,10 @@ export function useWebRtcTransport(): HIDTransport {
         state.value = TransportState.Error
       }
 
-      // 3. Handle remote video track
+      // 3. Add transceiver for receiving video from Android
+      pc.value.addTransceiver('video', { direction: 'recvonly' })
+
+      // 4. Handle remote video track
       pc.value.ontrack = (event) => {
         console.log('[WebRTC] Received remote track:', event.track.kind)
         const video = document.querySelector('video') as HTMLVideoElement
@@ -93,6 +96,9 @@ export function useWebRtcTransport(): HIDTransport {
       await pc.value.setRemoteDescription(answer)
       console.log('[WebRTC] Set remote description')
 
+      // 9. Start polling for ICE candidates (Android sends them after answer)
+      startIceCandidatePolling()
+
       return true
     } catch (err) {
       console.error('[WebRTC] Connection error:', err)
@@ -100,6 +106,8 @@ export function useWebRtcTransport(): HIDTransport {
       return false
     }
   }
+
+  let icePollInterval: ReturnType<typeof setInterval> | null = null
 
   async function pollForAnswer(): Promise<RTCSessionDescriptionInit> {
     const maxAttempts = 60 // 60 seconds timeout
@@ -110,6 +118,8 @@ export function useWebRtcTransport(): HIDTransport {
           const data = await response.json()
           if (data.type === 'answer' && data.sdp) {
             console.log('[WebRTC] Got answer from server')
+            // Process any ICE candidates from Android (initial batch)
+            processIceCandidates(data.candidates)
             return { type: data.type, sdp: data.sdp }
           }
         }
@@ -121,9 +131,58 @@ export function useWebRtcTransport(): HIDTransport {
     throw new Error('Timeout waiting for answer')
   }
 
+  function processIceCandidates(candidates: any[] | undefined) {
+    if (!candidates || !Array.isArray(candidates)) return
+    for (const cand of candidates) {
+      try {
+        const candidate = new RTCIceCandidate(cand)
+        pc.value?.addIceCandidate(candidate)
+        console.log('[WebRTC] Added Android ICE candidate')
+      } catch (e) {
+        console.error('[WebRTC] Failed to add ICE candidate:', e)
+      }
+    }
+  }
+
+  function startIceCandidatePolling() {
+    // Stop any existing polling
+    if (icePollInterval) {
+      clearInterval(icePollInterval)
+      icePollInterval = null
+    }
+    // Poll for new ICE candidates every 500ms for 30 seconds
+    let pollCount = 0
+    const maxPolls = 60
+    icePollInterval = setInterval(async () => {
+      pollCount++
+      if (pollCount > maxPolls) {
+        if (icePollInterval) {
+          clearInterval(icePollInterval)
+          icePollInterval = null
+        }
+        return
+      }
+      try {
+        const response = await fetch('/sdp')
+        if (response.ok) {
+          const data = await response.json()
+          processIceCandidates(data.candidates)
+        }
+      } catch (err) {
+        // Ignore polling errors
+      }
+    }, 500)
+  }
+
   async function disconnect(): Promise<void> {
     state.value = TransportState.Disconnected
     deviceInfo.value = null
+
+    // Stop ICE candidate polling
+    if (icePollInterval) {
+      clearInterval(icePollInterval)
+      icePollInterval = null
+    }
 
     if (dc.value) {
       dc.value.close()
