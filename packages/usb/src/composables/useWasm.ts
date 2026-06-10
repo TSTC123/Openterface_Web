@@ -195,6 +195,9 @@ export async function loadWasm(): Promise<CoreWASM> {
       },
     }
 
+    // Expose on window for @openterface/core's useHidCommands to access
+    ;(window as any)._wasmModule = coreMod
+
     coreReady = true
     console.log('[Core] loaded successfully')
 

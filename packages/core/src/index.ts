@@ -59,3 +59,12 @@ export interface HidCommands {
 }
 
 export const HidCommandsKey: InjectionKey<HidCommands> = Symbol('HidCommands')
+
+/** HID command builders — transport-agnostic composable */
+export { useHidCommands } from './useHidCommands'
+
+/** Paste text composable — transport-agnostic */
+export { usePasteText } from './usePasteText'
+
+/** Viewer keyboard composable — transport-agnostic */
+export { useViewerKeyboard } from './useViewerKeyboard'
